@@ -10,6 +10,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
+from .incoherent import IncoherentImager, psf_sigma_um
+
 if TYPE_CHECKING:
     import numpy as np
 
@@ -17,7 +19,7 @@ if TYPE_CHECKING:
     from collagen_shg.representations.image_bundle import ImageBundle
     from collagen_shg.representations.phantom import Phantom
 
-__all__ = ["Imager", "IncoherentImager", "CoherentImager", "NullImager"]
+__all__ = ["Imager", "IncoherentImager", "CoherentImager", "NullImager", "psf_sigma_um"]
 
 
 @runtime_checkable
@@ -33,18 +35,11 @@ class Imager(Protocol):
     ) -> ImageBundle: ...
 
 
-class IncoherentImager:
-    """Tier 1 fast incoherent imaging. Implemented in Livrable 2."""
-
-    def render(self, phantom, microscope, degradation, rng):  # noqa: ANN001
-        raise NotImplementedError("Tier 1 incoherent imaging lands in Livrable 2.")
-
-
 class CoherentImager:
-    """Tier 3 coherent SHG imaging. Implemented in Livrable 2/4."""
+    """Tier 3 coherent SHG imaging. Implemented in the coherent-imaging commit."""
 
     def render(self, phantom, microscope, degradation, rng):  # noqa: ANN001
-        raise NotImplementedError("Tier 3 coherent SHG imaging lands in Livrable 2/4.")
+        raise NotImplementedError("Tier 3 coherent SHG imaging lands in the next commit.")
 
 
 class NullImager:
