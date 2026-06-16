@@ -6,10 +6,25 @@ generator with **known ground truth** is co-designed with the organization **met
 that analyzers can be measured for bias/variance against the truth, and synthetic images
 provide free annotations to train extractors.
 
-This repository implements **Phase 0** (shared infrastructure and representations) and
-**Livrable 1** (the organization `metrics`, families A–G). The remaining computational modules
-(generators, analysis, P-SHG) are present as **stubs with stable interfaces**; they land in
-Livrables 2–4.
+This repository implements **Phase 0** (shared infrastructure and representations), **Livrable 1**
+(the organization `metrics`, families A–G), and **Livrable 2** (the structure/image generators
+and the closed validation loop). The remaining computational modules (resolved analysis, P-SHG)
+are present as **stubs with stable interfaces**; they land in Livrables 3–4.
+
+## Livrable 2 — generators + closed loop
+
+- `structure_generator` — `ProceduralStructureGenerator` (Tier 0): places fibrils (von Mises
+  axial orientation, crimp, diameter distribution), rasterizes a density + director volume, and
+  records the **known** organization ground truth (S₂/S₃/orientation, measured with the
+  Livrable 1 metrics). Deterministic for `{config, seed}`.
+- `imaging` — `IncoherentImager` (Tier 1): density ⊛ Gaussian PSF (NA/λ) + Beer–Lambert depth
+  attenuation + Poisson/read noise. `CoherentImager` (Tier 3, first-order): forward/backward
+  SHG via axial phase summation (QPM picture).
+- `validation` — `run_closed_loop(config)`: generate → image → analyze → `compare` to the ground
+  truth (bias). Aligned phantoms recover their mean orientation; isotropic phantoms measure low
+  order.
+- GUI — `generate_bundle(config)` and an orientation-RGB layer; `collagen-shg-gui --generate
+  config.yaml`.
 
 ## Livrable 1 — organization metrics (`collagen_shg.metrics`)
 
@@ -26,8 +41,8 @@ known orientation/spacing):
 - **F** per-fibre — `fiber_metrics`, `persistence_length` (crimp)
 - **G** topological defects — `defect_density` (winding number)
 
-The comparison/scoring harness (generator ↔ metrics, the "metrics of metrics") arrives with
-Livrable 2 once the generator exists.
+The closed-loop scoring (generator ↔ metrics) is wired in Livrable 2 via
+`collagen_shg.validation.run_closed_loop`; the full SNR/depth/dispersion sweeps build on it.
 
 ## Phase 0 scope (this milestone)
 
@@ -79,9 +94,10 @@ src/collagen_shg/
   config/            models, loader, seeds                    (Phase 0 — implemented)
   metrics/           structure_tensor, order, correlation,    (Livrable 1 — implemented)
                      fourier, texture, fibers, defects
-  structure_generator/  imaging/  refinement/                 (Livrable 2 — stubs)
+  structure_generator/  imaging/                               (Livrable 2 — implemented)
+  refinement/                                                  (Tier 2 / Phase 3 — stub)
   analysis_resolved/  pshg/                                   (Livrables 3–4 — stubs)
-  validation/        closed-loop harness skeleton + null run
+  validation/        closed loop (generate→image→analyze) + null run
   gui/               napari shell
 configs/   tissues/ microscopes/ runs/   (YAML presets)
 docs/      phase0 / livrable1 / spec     (design references — authoritative)
