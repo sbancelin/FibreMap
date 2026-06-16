@@ -6,9 +6,28 @@ generator with **known ground truth** is co-designed with the organization **met
 that analyzers can be measured for bias/variance against the truth, and synthetic images
 provide free annotations to train extractors.
 
-This repository currently implements **Phase 0 — shared infrastructure and representations**.
-Computational modules (metrics, generators, analysis, P-SHG) are present only as **stubs with
-stable interfaces**; their implementations land in Livrables 1–4.
+This repository implements **Phase 0** (shared infrastructure and representations) and
+**Livrable 1** (the organization `metrics`, families A–G). The remaining computational modules
+(generators, analysis, P-SHG) are present as **stubs with stable interfaces**; they land in
+Livrables 2–4.
+
+## Livrable 1 — organization metrics (`collagen_shg.metrics`)
+
+Families A–G, each with analytical tests (uniform → S = 1, isotropic → S = 0, sinusoid →
+known orientation/spacing):
+
+- **A** structure tensor — `structure_tensor_2d/3d` (orientation + coherence/FA; fibre axis =
+  minor eigenvector)
+- **B** order parameters — `order_parameter_2d` (S₂, κ via doubled angle), `order_tensor_3d`
+  (S₃, Saupe Q)
+- **C** orientation correlation — `orientation_correlation` (ξ via FFT/Wiener–Khinchin)
+- **D** Fourier — `power_spectrum_orientation` (orientation + spacing Λ*)
+- **E** texture — `glcm_features`, `lbp_histogram`, `gabor_energy`
+- **F** per-fibre — `fiber_metrics`, `persistence_length` (crimp)
+- **G** topological defects — `defect_density` (winding number)
+
+The comparison/scoring harness (generator ↔ metrics, the "metrics of metrics") arrives with
+Livrable 2 once the generator exists.
 
 ## Phase 0 scope (this milestone)
 
@@ -58,8 +77,9 @@ ruff check src tests                   # lint
 src/collagen_shg/
   representations/   phantom, image_bundle, conventions, io   (Phase 0 — implemented)
   config/            models, loader, seeds                    (Phase 0 — implemented)
+  metrics/           structure_tensor, order, correlation,    (Livrable 1 — implemented)
+                     fourier, texture, fibers, defects
   structure_generator/  imaging/  refinement/                 (Livrable 2 — stubs)
-  metrics/                                                    (Livrable 1 — stubs)
   analysis_resolved/  pshg/                                   (Livrables 3–4 — stubs)
   validation/        closed-loop harness skeleton + null run
   gui/               napari shell
