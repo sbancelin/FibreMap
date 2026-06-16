@@ -1,13 +1,17 @@
-"""Tier 0 — procedural 3D structure generator (Livrable 2). Interface only.
+"""Tier 0 — procedural 3D structure generator (Livrable 2).
 
 Contract (phase0 Tableau 4): ``StructureConfig -> Phantom``. Deterministic for a given
-``{config, seed}``. The concrete procedural placement of fibrils (centerlines, crimp,
-packing, director field) lands in Livrable 2; only the stable interface is fixed here.
+``{config, seed}``. :class:`ProceduralStructureGenerator` (in :mod:`.generator`) places fibrils
+as parametric curves and rasterizes them into a density + director volume with ground-truth
+organization metrics; :class:`NullStructureGenerator` is the trivial empty-phantom generator
+used by the Phase 0 null run.
 """
 
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
+
+from .generator import ProceduralStructureGenerator
 
 if TYPE_CHECKING:  # avoid runtime coupling to other modules
     import numpy as np
@@ -23,13 +27,6 @@ class StructureGenerator(Protocol):
     """A structure generator turns a typed config + RNG into a ground-truth ``Phantom``."""
 
     def generate(self, config: StructureConfig, rng: np.random.Generator) -> Phantom: ...
-
-
-class ProceduralStructureGenerator:
-    """Tier 0 deterministic generator. Implemented in Livrable 2."""
-
-    def generate(self, config: StructureConfig, rng: np.random.Generator) -> Phantom:
-        raise NotImplementedError("Tier 0 procedural structure generation lands in Livrable 2.")
 
 
 class NullStructureGenerator:
