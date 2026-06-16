@@ -21,10 +21,18 @@ from typing import Any
 
 import numpy as np
 
+from collagen_shg.gui.orientation import director_to_rgb
 from collagen_shg.representations.image_bundle import ImageBundle
 from collagen_shg.representations.io import read_bundle, read_ome_tiff
 
-__all__ = ["build_layers", "load_any", "add_bundle_to_viewer", "launch", "main"]
+__all__ = [
+    "build_layers",
+    "load_any",
+    "generate_bundle",
+    "add_bundle_to_viewer",
+    "launch",
+    "main",
+]
 
 # A napari "LayerData"-style tuple: (data, kwargs, layer_type).
 LayerData = tuple[np.ndarray, dict[str, Any], str]
@@ -72,7 +80,31 @@ def build_layers(bundle: ImageBundle) -> list[LayerData]:
               "visible": False},
              "image")
         )
+        rgb = director_to_rgb(np.asarray(fields.director), np.asarray(fields.order_S))
+        layers.append(
+            (rgb, {"name": "orientation (GT)", "scale": scale, "rgb": True, "visible": False},
+             "image")
+        )
     return layers
+
+
+def generate_bundle(config: Any, *, n_fibrils: int | None = None) -> ImageBundle:
+    """Generate a synthetic bundle from a validated ``Config`` (structure → incoherent image).
+
+    Convenience for the GUI's generation path; the heavy modules are imported lazily.
+    """
+    from collagen_shg.config.seeds import SeedManager
+    from collagen_shg.imaging.incoherent import IncoherentImager
+    from collagen_shg.structure_generator.generator import ProceduralStructureGenerator
+
+    seeds = SeedManager(config.run.seed)
+    generator = ProceduralStructureGenerator(
+        config.volume.shape_zyx, config.volume.voxel_size_zyx_um, n_fibrils=n_fibrils
+    )
+    phantom = generator.generate(config.structure, seeds.generator("structure"))
+    return IncoherentImager().render(
+        phantom, config.microscope, config.degradation, seeds.generator("noise")
+    )
 
 
 def add_bundle_to_viewer(viewer: Any, bundle: ImageBundle) -> Any:
@@ -83,12 +115,9 @@ def add_bundle_to_viewer(viewer: Any, bundle: ImageBundle) -> Any:
     return viewer
 
 
-def launch(path: str | Path, *, show: bool = True, block: bool = True) -> Any:
-    """Open a bundle/OME-TIFF in a napari viewer. Returns the viewer.
-
-    ``show=False`` builds the viewer without displaying it (useful for tests). ``block=True``
-    runs the napari event loop.
-    """
+def view_bundle(bundle: ImageBundle, *, title: str = "collagen-shg", show: bool = True,
+                block: bool = True) -> Any:
+    """Open an in-memory bundle in a napari viewer (lazy napari import)."""
     try:
         import napari
     except ModuleNotFoundError as exc:  # pragma: no cover - exercised only without the extra
@@ -96,24 +125,45 @@ def launch(path: str | Path, *, show: bool = True, block: bool = True) -> Any:
             "napari is required for the GUI shell. Install it with:\n"
             '    pip install -e ".[gui]"'
         ) from exc
-
-    bundle = load_any(path)
-    viewer = napari.Viewer(show=show, title=f"collagen-shg — {Path(path).name}")
+    viewer = napari.Viewer(show=show, title=title)
     add_bundle_to_viewer(viewer, bundle)
     if block and show:
         napari.run()
     return viewer
 
 
+def launch(path: str | Path, *, show: bool = True, block: bool = True) -> Any:
+    """Open a bundle/OME-TIFF in a napari viewer. Returns the viewer."""
+    bundle = load_any(path)
+    return view_bundle(bundle, title=f"collagen-shg — {Path(path).name}", show=show, block=block)
+
+
+def launch_generated(config_path: str | Path, *, show: bool = True, block: bool = True) -> Any:
+    """Generate a bundle from a config YAML and open it in napari (the generation path)."""
+    from collagen_shg.config.loader import load_config
+
+    config = load_config(config_path)
+    bundle = generate_bundle(config)
+    return view_bundle(bundle, title=f"collagen-shg — generated {config.run.name}",
+                       show=show, block=block)
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="collagen-shg-gui",
-        description="Open a collagen-shg bundle (or OME-TIFF) in a napari viewer.",
+        description="Open a collagen-shg bundle (or OME-TIFF) in a napari viewer, "
+        "or generate one from a config.",
     )
-    parser.add_argument("path", help="path to a *.bundle directory or an OME-TIFF file")
+    group = parser.add_mutually_exclusive_group(required=True)
+    group.add_argument("path", nargs="?", help="path to a *.bundle directory or an OME-TIFF file")
+    group.add_argument("--generate", metavar="CONFIG.yaml",
+                       help="generate a synthetic bundle from a run config and view it")
     args = parser.parse_args(argv)
     try:
-        launch(args.path)
+        if args.generate:
+            launch_generated(args.generate)
+        else:
+            launch(args.path)
     except ModuleNotFoundError as exc:
         print(str(exc), file=sys.stderr)
         return 1

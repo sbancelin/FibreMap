@@ -25,10 +25,12 @@ def test_build_layers_with_ground_truth_fields():
     b = ImageBundle.white((2, 4, 4), (0.5, 0.2, 0.2), phantom=p)
     layers = build_layers(b)
     names = [kw["name"] for _, kw, _ in layers]
-    assert names == ["image", "order_S (GT)", "density (GT)", "|director| (GT)"]
-    # director magnitude is computed over the channel axis
-    mag = layers[-1][0]
-    assert mag.shape == (2, 4, 4)
+    assert names == [
+        "image", "order_S (GT)", "density (GT)", "|director| (GT)", "orientation (GT)"
+    ]
+    rgb_data, rgb_kw, _ = layers[-1]
+    assert rgb_kw["rgb"] is True
+    assert rgb_data.shape == (2, 4, 4, 3)
 
 
 def test_load_any_roundtrips_bundle(tmp_path):
