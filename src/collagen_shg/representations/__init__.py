@@ -14,6 +14,7 @@ from .image_bundle import (
     MicroscopeMeta,
     Provenance,
 )
+from .io import read_bundle, read_ome_tiff, write_bundle, write_ome_tiff
 from .phantom import (
     DirectorFields,
     Fibril,
@@ -40,4 +41,9 @@ __all__ = [
     "MicroscopeMeta",
     "AcquisitionMeta",
     "Provenance",
+    # io
+    "write_bundle",
+    "read_bundle",
+    "read_ome_tiff",
+    "write_ome_tiff",
 ]
