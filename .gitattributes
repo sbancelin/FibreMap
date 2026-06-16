@@ -1,0 +1,11 @@
+# Normalize line endings: text files stored as LF in the repo.
+* text=auto eol=lf
+
+# Binary assets — never normalize.
+*.docx binary
+*.zarr binary
+*.tif binary
+*.tiff binary
+*.parquet binary
+*.npy binary
+*.png binary

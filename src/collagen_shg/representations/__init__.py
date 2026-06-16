@@ -6,4 +6,6 @@ algorithm. Submodules are wired up incrementally across Phase 0 commits.
 
 from __future__ import annotations
 
-__all__: list[str] = []
+from . import conventions
+
+__all__ = ["conventions"]
