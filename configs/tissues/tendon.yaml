@@ -1,0 +1,14 @@
+# Tissue preset — tendon (highly aligned, crimped collagen).
+# Indicative Phase 0 values; refined when the Tier 0 generator lands (Livrable 2).
+name: tendon
+orientation:
+  mean_phi_deg: 90.0
+  kappa: 12.0        # vMF/Watson concentration (high => strongly aligned)
+  xi_um: 40.0        # orientation correlation length
+fibril:
+  diameter_um:
+    mean: 1.5
+    dispersion: 0.3
+  crimp:
+    amplitude_um: 2.0
+    period_um: 25.0

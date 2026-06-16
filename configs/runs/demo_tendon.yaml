@@ -1,0 +1,30 @@
+# Example run configuration (phase0 §7). References tissue/microscope presets and overrides.
+run:
+  name: demo_tendon
+  seed: 20260612
+  output: datasets/demo_tendon.bundle
+
+volume:
+  shape_zyx: [64, 512, 512]
+  voxel_size_zyx_um: [0.5, 0.2, 0.2]
+
+structure:
+  preset: tendon            # inherits configs/tissues/tendon.yaml
+  overrides:
+    orientation: { mean_phi_deg: 90, kappa: 12, xi_um: 40 }
+    fibril:
+      diameter_um: { mean: 1.5, dispersion: 0.3 }
+      crimp: { amplitude_um: 2.0, period_um: 25 }
+
+microscope:
+  preset: default           # configs/microscopes/default.yaml
+  overrides:
+    mode: incoherent        # incoherent | coherent
+    NA: 0.95
+    wavelength_nm: 900
+    detection: backward
+    pixel_size_um: 0.2
+
+degradation:
+  depth: { attenuation_length_um: 80 }
+  noise: { photons_peak: 500, read_noise_e: 2.0 }

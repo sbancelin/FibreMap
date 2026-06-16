@@ -1,0 +1,16 @@
+# Tissue preset — cornea (sub-resolution fibrils, orthogonal lamellae; P-SHG regime).
+name: cornea
+orientation:
+  mean_phi_deg: 0.0
+  kappa: 8.0
+  xi_um: 20.0
+fibril:
+  diameter_um:
+    mean: 0.03        # ~30 nm: sub-resolution, treated as emitter density/orientation
+    dispersion: 0.1
+  crimp:
+    amplitude_um: 0.0
+    period_um: 0.0
+lamellae:
+  enabled: true
+  angle_step_deg: 90.0   # successive lamellae roughly orthogonal

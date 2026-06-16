@@ -1,0 +1,8 @@
+# Microscope preset — a generic backward-detected SHG setup.
+name: default
+mode: incoherent       # incoherent (Tier 1) | coherent (Tier 3)
+NA: 0.95
+wavelength_nm: 900.0
+detection: backward    # backward (epi, main modality) | forward
+pixel_size_um: 0.2
+psf_model: gaussian    # gaussian | richards-wolf

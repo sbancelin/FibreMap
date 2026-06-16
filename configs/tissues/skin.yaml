@@ -1,0 +1,13 @@
+# Tissue preset — skin / dermis (locally aligned, globally more isotropic basket-weave).
+name: skin
+orientation:
+  mean_phi_deg: 0.0
+  kappa: 2.0         # low concentration => weak global alignment
+  xi_um: 10.0        # short correlation length (multi-domain)
+fibril:
+  diameter_um:
+    mean: 1.0
+    dispersion: 0.4
+  crimp:
+    amplitude_um: 1.0
+    period_um: 15.0
