@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
+from .coherent import CoherentImager
 from .incoherent import IncoherentImager, psf_sigma_um
 
 if TYPE_CHECKING:
@@ -33,13 +34,6 @@ class Imager(Protocol):
         degradation: DegradationConfig,
         rng: np.random.Generator,
     ) -> ImageBundle: ...
-
-
-class CoherentImager:
-    """Tier 3 coherent SHG imaging. Implemented in the coherent-imaging commit."""
-
-    def render(self, phantom, microscope, degradation, rng):  # noqa: ANN001
-        raise NotImplementedError("Tier 3 coherent SHG imaging lands in the next commit.")
 
 
 class NullImager:
