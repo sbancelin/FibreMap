@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from collagen_shg.representations.phantom import Phantom
 
-__all__ = ["ComparisonReport", "compare"]
+__all__ = ["ComparisonReport", "compare", "run_null_pipeline"]
 
 
 @dataclass
@@ -27,6 +27,9 @@ class ComparisonReport:
     notes: str = ""
 
 
-def compare(phantom: "Phantom", analysis_output: Any) -> ComparisonReport:
+def compare(phantom: Phantom, analysis_output: Any) -> ComparisonReport:
     """Compare an analyzer output against the phantom ground truth. Implemented per-Livrable."""
     raise NotImplementedError("Quantitative bias/variance comparison lands with the metrics.")
+
+
+from .null_run import run_null_pipeline  # noqa: E402  (wired after the skeleton above)

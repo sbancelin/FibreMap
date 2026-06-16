@@ -16,7 +16,7 @@ NumPy (validated for shape/dtype) and persisted by :mod:`collagen_shg.representa
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any, Literal
 
 import numpy as np
@@ -37,7 +37,7 @@ __all__ = [
 
 
 def _utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 class Units(BaseModel):
@@ -79,7 +79,7 @@ class PhantomMeta(BaseModel):
         return v
 
     @model_validator(mode="after")
-    def _fill_bounds(self) -> "PhantomMeta":
+    def _fill_bounds(self) -> PhantomMeta:
         if self.bounds_um is None:
             object.__setattr__(
                 self, "bounds_um", cv.bounds_um(self.shape_zyx, self.voxel_size_zyx)
@@ -119,7 +119,7 @@ class Fibril(BaseModel):
         return np.ascontiguousarray(a)
 
     @model_validator(mode="after")
-    def _consistent_length(self) -> "Fibril":
+    def _consistent_length(self) -> Fibril:
         if self.centerline.shape[0] != self.diameter.shape[0]:
             raise ValueError(
                 f"centerline ({self.centerline.shape[0]}) and diameter "
@@ -155,7 +155,7 @@ class DirectorFields(BaseModel):
         return np.ascontiguousarray(a)
 
     @model_validator(mode="after")
-    def _consistent_shapes(self) -> "DirectorFields":
+    def _consistent_shapes(self) -> DirectorFields:
         zyx = self.director.shape[1:]
         for name in ("order_S", "density", "polarity"):
             if getattr(self, name).shape != zyx:
@@ -169,7 +169,7 @@ class DirectorFields(BaseModel):
         return tuple(int(s) for s in self.director.shape[1:])  # type: ignore[return-value]
 
     @classmethod
-    def zeros(cls, shape_zyx: tuple[int, int, int]) -> "DirectorFields":
+    def zeros(cls, shape_zyx: tuple[int, int, int]) -> DirectorFields:
         """Empty fields: zero director, zero order/density/polarity."""
         z, y, x = (int(s) for s in shape_zyx)
         return cls(
@@ -211,7 +211,7 @@ class Phantom(BaseModel):
     ground_truth: OrganizationGT = Field(default_factory=OrganizationGT)
 
     @model_validator(mode="after")
-    def _fields_match_meta(self) -> "Phantom":
+    def _fields_match_meta(self) -> Phantom:
         if self.fields is not None and self.fields.shape_zyx != self.meta.shape_zyx:
             raise ValueError(
                 f"fields shape {self.fields.shape_zyx} != meta.shape_zyx {self.meta.shape_zyx}"
@@ -227,7 +227,7 @@ class Phantom(BaseModel):
         seed: int | None = None,
         tissue_preset: str | None = None,
         with_fields: bool = True,
-    ) -> "Phantom":
+    ) -> Phantom:
         """An empty phantom: no fibrils, zeroed fields, default (empty) ground truth.
 
         Used by the Phase 0 *null run* and as a minimal valid construction.

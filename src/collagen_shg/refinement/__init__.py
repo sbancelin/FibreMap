@@ -18,7 +18,7 @@ __all__ = ["Refiner", "LearnedRefiner"]
 
 @runtime_checkable
 class Refiner(Protocol):
-    def refine(self, bundle: "ImageBundle") -> "ImageBundle": ...
+    def refine(self, bundle: ImageBundle) -> ImageBundle: ...
 
 
 class LearnedRefiner:

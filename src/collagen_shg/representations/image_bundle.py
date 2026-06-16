@@ -87,7 +87,7 @@ class ImageBundle(BaseModel):
         return np.ascontiguousarray(a)
 
     @model_validator(mode="after")
-    def _shape_consistency(self) -> "ImageBundle":
+    def _shape_consistency(self) -> ImageBundle:
         spatial = tuple(int(s) for s in self.image.shape[-3:])
         if spatial != self.metadata.shape_zyx:
             raise ValueError(
@@ -114,7 +114,7 @@ class ImageBundle(BaseModel):
         dtype: Any = np.float32,
         phantom: Phantom | None = None,
         metadata: BundleMetadata | None = None,
-    ) -> "ImageBundle":
+    ) -> ImageBundle:
         """A uniform ("white") image bundle — the Phase 0 null-run image.
 
         ``fill`` is the constant intensity (default ``1.0`` for float). Pass a ``phantom`` to

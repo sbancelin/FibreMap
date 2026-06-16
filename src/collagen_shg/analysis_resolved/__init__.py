@@ -12,12 +12,12 @@ from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 if TYPE_CHECKING:
     import numpy as np
 
-__all__ = ["Analyzer", "ResolvedAnalyzer"]
+__all__ = ["Analyzer", "ResolvedAnalyzer", "TrivialAnalyzer"]
 
 
 @runtime_checkable
 class Analyzer(Protocol):
-    def analyze(self, image: "np.ndarray") -> Any: ...
+    def analyze(self, image: np.ndarray) -> Any: ...
 
 
 class ResolvedAnalyzer:
@@ -25,3 +25,22 @@ class ResolvedAnalyzer:
 
     def analyze(self, image):  # noqa: ANN001
         raise NotImplementedError("Resolved-tissue analysis lands in Livrable 3.")
+
+
+class TrivialAnalyzer:
+    """Trivial analyzer returning basic intensity statistics — used by the Phase 0 null run.
+
+    Conforms to :class:`Analyzer`; it does no organization analysis (that lands in Livrable 3),
+    only enough to prove the generator → imaging → analysis interfaces wire together.
+    """
+
+    def analyze(self, image):  # noqa: ANN001
+        import numpy as np
+
+        a = np.asarray(image)
+        return {
+            "shape": tuple(int(s) for s in a.shape),
+            "mean": float(a.mean()),
+            "min": float(a.min()),
+            "max": float(a.max()),
+        }

@@ -39,7 +39,8 @@ def test_preset_inheritance_and_override():
     cfg = load_config_dict(raw)
     assert cfg.structure.orientation.kappa == 99  # overridden
     assert cfg.structure.orientation.xi_um == 40.0  # inherited from tendon preset
-    assert cfg.structure.orientation.mean_phi_deg == 90.0  # inherited, not wiped by sibling override
+    # inherited, not wiped by a sibling override:
+    assert cfg.structure.orientation.mean_phi_deg == 90.0
     assert cfg.structure.fibril.diameter_um.mean == 1.5  # inherited deep value
 
 

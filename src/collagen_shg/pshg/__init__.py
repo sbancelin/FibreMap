@@ -17,7 +17,7 @@ __all__ = ["PSHGAnalyzer", "LinearPSHGAnalyzer"]
 
 @runtime_checkable
 class PSHGAnalyzer(Protocol):
-    def analyze(self, stack: "np.ndarray", angles_rad: "np.ndarray") -> Any: ...
+    def analyze(self, stack: np.ndarray, angles_rad: np.ndarray) -> Any: ...
 
 
 class LinearPSHGAnalyzer:

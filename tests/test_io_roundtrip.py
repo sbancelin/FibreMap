@@ -47,7 +47,9 @@ def _rich_bundle(rng: np.random.Generator) -> ImageBundle:
         kind="synthetic",
         shape_zyx=shape,
         voxel_size_zyx=voxel,
-        microscope=MicroscopeMeta(mode="incoherent", NA=0.95, wavelength_nm=900, detection="backward"),
+        microscope=MicroscopeMeta(
+            mode="incoherent", NA=0.95, wavelength_nm=900, detection="backward"
+        ),
     )
     metadata.provenance.seed = 7
     return ImageBundle(image=image, metadata=metadata, phantom=p,
@@ -75,7 +77,7 @@ def test_bundle_roundtrip_bit_exact(tmp_path):
 
     # geometry: structural identity
     assert len(r.phantom.geometry) == 2
-    for fr, fb in zip(r.phantom.geometry, b.phantom.geometry):
+    for fr, fb in zip(r.phantom.geometry, b.phantom.geometry, strict=True):
         assert fr.id == fb.id
         assert fr.polarity == fb.polarity
         assert fr.fiber_id == fb.fiber_id
@@ -93,7 +95,8 @@ def test_bundle_roundtrip_bit_exact(tmp_path):
 
 
 def test_bundle_roundtrip_empty_phantom(tmp_path):
-    b = ImageBundle.white((2, 4, 4), (0.5, 0.2, 0.2), phantom=Phantom.empty((2, 4, 4), (0.5, 0.2, 0.2)))
+    p = Phantom.empty((2, 4, 4), (0.5, 0.2, 0.2))
+    b = ImageBundle.white((2, 4, 4), (0.5, 0.2, 0.2), phantom=p)
     path = tmp_path / "empty.bundle"
     write_bundle(b, path)
     r = read_bundle(path)
