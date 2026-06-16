@@ -7,9 +7,22 @@ that analyzers can be measured for bias/variance against the truth, and syntheti
 provide free annotations to train extractors.
 
 This repository implements **Phase 0** (shared infrastructure and representations), **Livrable 1**
-(the organization `metrics`, families A–G), and **Livrable 2** (the structure/image generators
-and the closed validation loop). The remaining computational modules (resolved analysis, P-SHG)
-are present as **stubs with stable interfaces**; they land in Livrables 3–4.
+(the organization `metrics`, families A–G), **Livrable 2** (the structure/image generators and the
+closed validation loop), and **Livrable 3** (resolved-tissue analysis). The remaining computational
+module (P-SHG) is present as a **stub with a stable interface**; it lands in Livrable 4.
+
+## Livrable 3 — resolved-tissue analysis (`collagen_shg.analysis_resolved`)
+
+Field-based chain (the robust "short-cut to extraction"; the learned extractor trained on
+synthetic centerlines is a later component):
+
+- `preprocess` — flat-field, orientation-preserving denoise, background subtraction
+- `multiscale_orientation_3d` — structure tensor over rho scales, per-voxel max-anisotropy
+- `organization_descriptors_3d` — core triplet (order S₂/S₃, correlation length ξ, defect
+  density) + bootstrap CIs (`bootstrap_order_ci`) + fixed-length `descriptor_vector`
+- `ResolvedAnalyzer.analyze[_bundle]` — orientation/coherence maps + descriptors; validated in
+  the closed loop (recovers a generated phantom's mean orientation and order)
+- inter-tissue comparison — `PCA`, `NearestCentroidClassifier`, `standardize` (NumPy only)
 
 ## Livrable 2 — generators + closed loop
 
@@ -95,8 +108,10 @@ src/collagen_shg/
   metrics/           structure_tensor, order, correlation,    (Livrable 1 — implemented)
                      fourier, texture, fibers, defects
   structure_generator/  imaging/                               (Livrable 2 — implemented)
+  analysis_resolved/ preprocess, orientation_field,            (Livrable 3 — implemented)
+                     descriptors, analyzer, compare_tissues
   refinement/                                                  (Tier 2 / Phase 3 — stub)
-  analysis_resolved/  pshg/                                   (Livrables 3–4 — stubs)
+  pshg/                                                        (Livrable 4 — stub)
   validation/        closed loop (generate→image→analyze) + null run
   gui/               napari shell
 configs/   tissues/ microscopes/ runs/   (YAML presets)
