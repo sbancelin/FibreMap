@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Virtual envs (the project venv lives outside the repo, but ignore local ones too)
+.venv/
+venv/
+env/
+
+# Datasets / generated artifacts (bundles can be large)
+*.bundle/
+datasets/
+tests/data/scratch/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Keep extracted-spec scratch out of the tree
+_specs_extracted.txt
