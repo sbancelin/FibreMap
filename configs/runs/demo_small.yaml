@@ -1,0 +1,28 @@
+# Small, fast run config for interactive testing (seconds, low memory).
+# The full-size example is configs/runs/demo_tendon.yaml (64x512x512, slow/large).
+run:
+  name: demo_small
+  seed: 20260616
+  output: datasets/demo_small.bundle
+
+volume:
+  shape_zyx: [16, 128, 128]
+  voxel_size_zyx_um: [0.5, 0.2, 0.2]
+
+structure:
+  preset: tendon            # inherits configs/tissues/tendon.yaml
+  overrides:
+    orientation: { mean_phi_deg: 90, kappa: 20, xi_um: 40 }
+
+microscope:
+  preset: default
+  overrides:
+    mode: incoherent
+    NA: 0.95
+    wavelength_nm: 900
+    detection: backward
+    pixel_size_um: 0.2
+
+degradation:
+  depth: { attenuation_length_um: 80 }
+  noise: { photons_peak: 2000, read_noise_e: 2.0 }

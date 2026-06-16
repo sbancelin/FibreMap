@@ -95,9 +95,14 @@ python -m pip install -e ".[dev,gui]"  # add the napari GUI shell
 
 ```bash
 pytest                                 # run the test suite
+python examples/quickstart.py          # end-to-end: generate → image → analyze (closed loop)
 collagen-shg-gui path/to/dataset.bundle   # launch the napari shell on a bundle
 ruff check src tests                   # lint
 ```
+
+**Full usage manual (FR):** [docs/MANUEL.md](docs/MANUEL.md) — installation, every command line,
+the Python API for each capability, the config/parameter reference, and runnable examples under
+[examples/](examples/).
 
 ## Layout
 
