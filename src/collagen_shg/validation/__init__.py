@@ -1,35 +1,27 @@
-"""Closed-loop validation harness (skeleton).
+"""Closed-loop validation harness.
 
 Contract (phase0 Tableau 4): ``(Phantom, analysis output) -> comparison report
-(bias/variance)``. In Phase 0 only the skeleton and the end-to-end *null run* are wired (see
-``null_run``); the parameter sweeps (SNR / depth / dispersion) arrive with the relevant
-Livrables.
+(bias/variance)``. The closed loop (generate → image → analyze → compare) is in
+:mod:`.closed_loop`; the Phase 0 end-to-end *null run* (interface wiring) is in :mod:`.null_run`.
+The parameter sweeps (SNR / depth / dispersion) build on ``run_closed_loop``.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any
+from .closed_loop import (
+    ClosedLoopReport,
+    ComparisonReport,
+    analyze_image_3d,
+    compare,
+    run_closed_loop,
+)
+from .null_run import run_null_pipeline
 
-if TYPE_CHECKING:
-    from collagen_shg.representations.phantom import Phantom
-
-__all__ = ["ComparisonReport", "compare", "run_null_pipeline"]
-
-
-@dataclass
-class ComparisonReport:
-    """Result of comparing measured descriptors against a phantom's ground truth."""
-
-    measured: dict[str, Any] = field(default_factory=dict)
-    ground_truth: dict[str, Any] = field(default_factory=dict)
-    bias: dict[str, float] = field(default_factory=dict)
-    notes: str = ""
-
-
-def compare(phantom: Phantom, analysis_output: Any) -> ComparisonReport:
-    """Compare an analyzer output against the phantom ground truth. Implemented per-Livrable."""
-    raise NotImplementedError("Quantitative bias/variance comparison lands with the metrics.")
-
-
-from .null_run import run_null_pipeline  # noqa: E402  (wired after the skeleton above)
+__all__ = [
+    "ComparisonReport",
+    "ClosedLoopReport",
+    "compare",
+    "analyze_image_3d",
+    "run_closed_loop",
+    "run_null_pipeline",
+]
