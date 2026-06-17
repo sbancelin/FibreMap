@@ -113,22 +113,49 @@ Sortie attendue (config `demo_small`) :
 
 ## 4. Interface graphique (napari)
 
-Nécessite l'extra `gui` installé et un affichage. Deux usages :
+Nécessite l'extra `gui` installé (`pip install -e ".[dev,gui]"`) et un affichage.
+
+### 4.1 Application interactive (le cas principal)
+
+Lancez **sans argument** → une appli à **3 onglets** s'ouvre dans napari (panneau de droite) :
 
 ```powershell
-# Visualiser un bundle déjà écrit (ou un OME-TIFF)
+collagen-shg-gui
+```
+
+- **Onglet 1 · Structure** — réglez la ROI (`Z`, `Y`, `X` voxels ; `voxel_*_um`), le nombre de
+  fibrilles (`n_fibrils`), le `diameter_um` + `dispersion`, le crimp (`crimp_amplitude_um`,
+  `crimp_period_um`), l'organisation (`mean_phi_deg`, `kappa`, `xi_um`) et la `seed`.
+  Cliquez **« Générer la structure »** → s'affichent le volume de densité, l'orientation (RVB :
+  teinte = azimut) et le **squelette** des fibrilles ; la vérité-terrain (S2/S3/φ) est affichée
+  en notification.
+- **Onglet 2 · Imagerie** — réglez le microscope (`NA`, `wavelength_nm`, `detection`,
+  `attenuation_length_um`, `photons_peak`, `read_noise_e`, `seed`). Cliquez **« Générer
+  l'image »** → image SHG incohérente (modèle scalaire). La case **`realiste_tier2`** applique
+  une étape de raffinement *placeholder* (le vrai modèle, entraîné sur données réelles, viendra).
+- **Onglet 3 · Analyse** — **« Analyser l'image courante »** extrait l'organisation de l'image
+  générée (cartes orientation/cohérence + S2/S3/ξ/défauts en notification). **« Charger &
+  analyser »** ouvre un sélecteur de fichier pour une **image réelle** (OME-TIFF) ou un bundle, et
+  l'analyse de la même façon (les images 2D passent par les métriques 2D).
+
+> Astuce : le volume est 3D — utilisez le **curseur en bas** pour parcourir les plans z, et l'œil
+> 👁 à gauche de chaque couche pour l'afficher/masquer.
+
+### 4.2 Modes rapides (optionnels)
+
+```powershell
+# Visualiser un bundle déjà écrit (ou un OME-TIFF), sans panneau de contrôle
 collagen-shg-gui datasets/demo_small.bundle
 collagen-shg-gui mon_image.ome.tif
 
-# Générer un bundle depuis un config ET l'afficher
+# Générer un bundle depuis un fichier de config ET l'afficher
 collagen-shg-gui --generate configs/runs/demo_small.yaml
 
 collagen-shg-gui --help
 ```
 
-Couches affichées : l'image, et si la vérité-terrain est présente : `order_S`, `density`,
-`|director|`, et **`orientation (GT)`** (RVB : teinte = azimut). Les couches GT sont masquées par
-défaut (cochez-les dans napari).
+> Si `collagen-shg-gui` n'est pas reconnu (venv non activé) :
+> `C:\env_python\env_FibreMap\Scripts\collagen-shg-gui.exe`
 
 ---
 
@@ -370,6 +397,7 @@ python -m pytest                                   # tous les tests
 python examples/quickstart.py                      # boucle fermée bout-en-bout
 python examples/metrics_demo.py                    # démo métriques
 python examples/coherent_fb_demo.py                # démo SHG cohérente
+collagen-shg-gui                                   # appli interactive 3 onglets (napari)
 collagen-shg-gui --generate configs/runs/demo_small.yaml   # générer + voir (napari)
 collagen-shg-gui datasets/demo_small.bundle        # voir un bundle existant
 ```
