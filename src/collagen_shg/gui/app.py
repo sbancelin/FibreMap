@@ -151,10 +151,11 @@ def launch_generated(config_path: str | Path, *, show: bool = True, block: bool 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="collagen-shg-gui",
-        description="Open a collagen-shg bundle (or OME-TIFF) in a napari viewer, "
-        "or generate one from a config.",
+        description="Interactive collagen-shg GUI (generation / imaging / analysis). "
+        "With no argument, launches the full interactive app; or quickly view a bundle/"
+        "OME-TIFF, or generate one from a config.",
     )
-    group = parser.add_mutually_exclusive_group(required=True)
+    group = parser.add_mutually_exclusive_group()
     group.add_argument("path", nargs="?", help="path to a *.bundle directory or an OME-TIFF file")
     group.add_argument("--generate", metavar="CONFIG.yaml",
                        help="generate a synthetic bundle from a run config and view it")
@@ -162,8 +163,12 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if args.generate:
             launch_generated(args.generate)
-        else:
+        elif args.path:
             launch(args.path)
+        else:
+            from collagen_shg.gui.interactive import run_app
+
+            run_app()
     except ModuleNotFoundError as exc:
         print(str(exc), file=sys.stderr)
         return 1
