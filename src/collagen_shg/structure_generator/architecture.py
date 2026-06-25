@@ -208,23 +208,57 @@ def sample_axial_directions(
     flat = mean.reshape(-1, 3)
     n = flat.shape[0]
 
-    if kappa_par <= 1e-6 and kappa_perp <= 1e-6:
-        v = rng.standard_normal((n, 3))
-        v /= np.linalg.norm(v, axis=1, keepdims=True)
-        return v.reshape(mean.shape)
+    kpar = max(float(kappa_par), 0.0)
+    kperp = max(float(kappa_perp), 0.0)
 
+    # Tangent frame at each mean direction: e1 in-plane, e2 out-of-plane.
     z_hat = np.array([0.0, 0.0, 1.0])
     e1 = np.cross(flat, z_hat)
     bad = np.linalg.norm(e1, axis=1) < 1e-8
     e1[bad] = np.cross(flat[bad], np.array([1.0, 0.0, 0.0]))
-    e1 /= np.linalg.norm(e1, axis=1, keepdims=True)  # in-plane perpendicular
+    e1 /= np.linalg.norm(e1, axis=1, keepdims=True)
     e2 = np.cross(flat, e1)
-    e2 /= np.linalg.norm(e2, axis=1, keepdims=True)  # out-of-plane perpendicular
+    e2 /= np.linalg.norm(e2, axis=1, keepdims=True)
 
-    sigma_par = 1.0 / np.sqrt(max(kappa_par, 1e-6))
-    sigma_perp = 1.0 / np.sqrt(max(kappa_perp, 1e-6))
-    d1 = rng.normal(0.0, sigma_par, n)
-    d2 = rng.normal(0.0, sigma_perp, n)
-    out = flat + d1[:, None] * e1 + d2[:, None] * e2
+    # Polar deviation gamma from the axis: axial Watson, governed by the LOWER concentration
+    # (the broadest direction sets how far it spreads). u = cos(gamma) ~ exp(kpolar u^2) on [0,1].
+    kpolar = min(kpar, kperp)
+    u = _sample_watson_u(kpolar, n, rng)
+    gamma = np.arccos(np.clip(u, 0.0, 1.0))
+
+    # Azimuth of the deviation in the tangent plane: concentrate toward the lower-kappa axis so
+    # the spread is anisotropic (biaxial). Equal kappa -> uniform azimuth (axisymmetric Watson).
+    if abs(kpar - kperp) < 1e-9:
+        psi = rng.uniform(0.0, 2.0 * np.pi, n)
+    else:
+        conc = min(abs(kperp - kpar), 200.0)
+        mu2 = 0.0 if kpar <= kperp else np.pi  # favor e1 (in-plane) or e2 (out-of-plane)
+        psi = rng.vonmises(mu2, conc, n) / 2.0
+    uhat = np.cos(psi)[:, None] * e1 + np.sin(psi)[:, None] * e2
+
+    sign = rng.choice(np.array([-1.0, 1.0]), n)  # fibres are axial (n == -n)
+    out = sign[:, None] * (flat * np.cos(gamma)[:, None] + uhat * np.sin(gamma)[:, None])
     out /= np.linalg.norm(out, axis=1, keepdims=True)
     return out.reshape(mean.shape)
+
+
+def _sample_watson_u(kappa: float, n: int, rng: np.random.Generator) -> NDArray[np.float64]:
+    """Sample ``u = cos(gamma) in [0, 1]`` with density ``∝ exp(kappa·u²)`` (vectorized rejection).
+
+    ``kappa = 0`` → uniform u → ``gamma`` distributed as ``sin gamma`` (isotropic hemisphere).
+    """
+    if kappa < 1e-6:
+        return rng.uniform(0.0, 1.0, n)
+    res = np.empty(n)
+    need = np.ones(n, dtype=bool)
+    for _ in range(200):
+        m = int(need.sum())
+        if m == 0:
+            break
+        prop = rng.uniform(0.0, 1.0, m)
+        accept = rng.uniform(0.0, 1.0, m) < np.exp(kappa * (prop**2 - 1.0))
+        idx = np.flatnonzero(need)[accept]
+        res[idx] = prop[accept]
+        need[idx] = False
+    res[need] = 1.0  # fallback for very high kappa: fully concentrated
+    return res
