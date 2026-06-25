@@ -139,19 +139,27 @@ def generate_structure_phantom(
 
 
 # --------------------------------------------------------------------------- display
-def _show_structure(state: AppState) -> None:
+def _show_structure(
+    state: AppState, *, fibrils: bool = True, skeleton: bool = True, orientation: bool = False
+) -> None:
     viewer, phantom = state.viewer, state.phantom
     scale = phantom.meta.voxel_size_zyx
     _set_layer(viewer, "fibrils (binary)", np.asarray(phantom.fields.density), "image",
-               scale=scale, colormap="gray", blending="additive")
+               scale=scale, colormap="gray", blending="additive", visible=fibrils)
     rgb = director_to_rgb(np.asarray(phantom.fields.director), np.asarray(phantom.fields.order_S))
-    _set_layer(viewer, "orientation (GT)", rgb, "image", scale=scale, rgb=True, visible=False)
+    _set_layer(viewer, "orientation (GT)", rgb, "image", scale=scale, rgb=True, visible=orientation)
     paths = skeleton_paths(phantom)
     if "skeleton" in viewer.layers:
         del viewer.layers["skeleton"]
     if paths:
         viewer.add_shapes(paths, shape_type="path", name="skeleton", scale=scale,
-                          edge_color="cyan", edge_width=0.3, blending="translucent")
+                          edge_color="cyan", edge_width=0.3, blending="translucent",
+                          visible=skeleton)
+
+
+def _toggle_layer(viewer: Any, name: str, visible: bool) -> None:
+    if name in viewer.layers:
+        viewer.layers[name].visible = visible
 
 
 def _show_image(state: AppState) -> None:
@@ -188,6 +196,7 @@ def _structure_tab(state: AppState):
     )
     from napari.utils.notifications import show_info
 
+    # --- Block 1: imaged volume (Size/Voxel x X/Y/Z; # voxels derived, read-only) ---
     volume = Table(
         value={
             "data": [[20.0, 20.0, 10.0], [0.2, 0.2, 0.5], [100, 100, 20]],
@@ -198,9 +207,9 @@ def _structure_tab(state: AppState):
 
     def _refresh_counts(*_: Any) -> None:
         data = [list(row) for row in volume.data]
-        size = [float(v) for v in data[0]]
-        vox = [float(v) for v in data[1]]
-        counts = voxel_counts(tuple(size), tuple(vox))
+        counts = voxel_counts(
+            tuple(float(v) for v in data[0]), tuple(float(v) for v in data[1])
+        )
         if [int(c) for c in data[2]] != list(counts):
             volume.value = {
                 "data": [data[0], data[1], list(counts)],
@@ -210,23 +219,41 @@ def _structure_tab(state: AppState):
 
     volume.changed.connect(_refresh_counts)
 
-    # Block 2 — single fibril
+    # --- Block 2: single fibril geometry ---
+    amount_mode = ComboBox(choices=["Number of fibrils", "Volume fraction"],
+                           value="Number of fibrils", label="Amount by")
     n_fibrils = SpinBox(value=150, min=1, max=20000, label="Number of fibrils")
-    use_fraction = CheckBox(value=False, label="Use volume fraction instead")
-    volume_fraction = FloatSpinBox(value=0.1, min=0.0, max=1.0, step=0.01, label="Volume fraction")
-    diameter_um = FloatSpinBox(value=1.0, min=0.02, max=20.0, step=0.1, label="Diameter mean (µm)")
-    diameter_cv = FloatSpinBox(value=0.3, min=0.0, max=2.0, step=0.05, label="Diameter CV")
-    length_um = FloatSpinBox(value=0.0, min=0.0, max=2000.0, step=1.0,
-                             label="Length mean (µm, 0=span)")
-    length_cv = FloatSpinBox(value=0.0, min=0.0, max=2.0, step=0.05, label="Length CV")
+    volume_fraction = FloatSpinBox(value=0.1, min=0.0, max=1.0, step=0.01,
+                                   label="Volume fraction φ_v")
+
+    def _amount_visibility(*_: Any) -> None:
+        is_number = amount_mode.value == "Number of fibrils"
+        n_fibrils.visible = is_number
+        volume_fraction.visible = not is_number
+
+    amount_mode.changed.connect(_amount_visibility)
+    _amount_visibility()
+
+    # Diameter / length distribution table (CV = coefficient of variation = std / mean).
+    morphology = Table(
+        value={
+            "data": [[1.0, 0.3], [0.0, 0.0]],
+            "index": ["Diameter (µm)", "Length (µm)"],
+            "columns": ["Mean", "CV"],
+        }
+    )
+    morphology.native.setToolTip("CV = coefficient of variation = std / mean.\n"
+                                 "Length mean = 0 means fibrils span the volume.")
+
     persistence_um = FloatSpinBox(value=1e6, min=1.0, max=1e6, step=10.0,
                                   label="Persistence Lp (µm)")
     crimp_amplitude_um = FloatSpinBox(value=0.0, min=0.0, max=20.0, step=0.1,
-                                      label="Crimp amplitude (µm)")
-    crimp_period_um = FloatSpinBox(value=0.0, min=0.0, max=200.0, step=1.0,
-                                   label="Crimp period (µm)")
+                                      label="Amplitude (µm)")
+    crimp_period_um = FloatSpinBox(value=0.0, min=0.0, max=200.0, step=1.0, label="Period (µm)")
+    crimp_row = Container(widgets=[crimp_amplitude_um, crimp_period_um],
+                          layout="horizontal", label="Crimp", labels=True)
 
-    # Block 3 — organization
+    # --- Block 3: network organization ---
     architecture = ComboBox(choices=ARCHITECTURE_CHOICES, value="uniaxial", label="Architecture")
     mean_phi_deg = FloatSpinBox(value=90.0, min=0.0, max=180.0, label="Mean azimuth φ₀ (°)")
     mean_theta_deg = FloatSpinBox(value=0.0, min=-90.0, max=90.0, label="Mean elevation θ₀ (°)")
@@ -265,6 +292,19 @@ def _structure_tab(state: AppState):
     architecture.changed.connect(_update_visibility)
     _update_visibility()
 
+    # --- Display options (which layers to show after Generate) ---
+    show_fibrils = CheckBox(value=True, label="Fibrils (binary)")
+    show_skeleton = CheckBox(value=True, label="Skeleton")
+    show_orientation = CheckBox(value=False, label="Orientation (GT)")
+    show_fibrils.changed.connect(
+        lambda *_: _toggle_layer(state.viewer, "fibrils (binary)", show_fibrils.value))
+    show_skeleton.changed.connect(
+        lambda *_: _toggle_layer(state.viewer, "skeleton", show_skeleton.value))
+    show_orientation.changed.connect(
+        lambda *_: _toggle_layer(state.viewer, "orientation (GT)", show_orientation.value))
+    display_row = Container(widgets=[show_fibrils, show_skeleton, show_orientation],
+                            layout="horizontal", label="Display", labels=False)
+
     generate = PushButton(text="Generate structure")
     status = Label(value="")
 
@@ -273,6 +313,7 @@ def _structure_tab(state: AppState):
         data = [list(row) for row in volume.data]
         size = tuple(float(v) for v in data[0])
         vox = tuple(float(v) for v in data[1])
+        morph = [list(r) for r in morphology.data]
         flat = {
             "mean_phi_deg": mean_phi_deg.value, "mean_theta_deg": mean_theta_deg.value,
             "phi_a_deg": phi_a_deg.value, "phi_b_deg": phi_b_deg.value, "mix": mix.value,
@@ -282,20 +323,22 @@ def _structure_tab(state: AppState):
             "helix_beta_deg": helix_beta_deg.value, "crossed": crossed.value,
         }
         params = arch_params_for(str(architecture.value), flat)
+        by_number = amount_mode.value == "Number of fibrils"
         phantom = generate_structure_phantom(
             size, vox, str(architecture.value), params, seed=seed.value,
-            n_fibrils=None if use_fraction.value else int(n_fibrils.value),
+            n_fibrils=int(n_fibrils.value) if by_number else None,
             kappa_par=kappa_par.value, kappa_perp=kappa_perp.value, xi_um=xi_um.value,
-            diameter_um=diameter_um.value, diameter_cv=diameter_cv.value,
-            length_um=length_um.value, length_cv=length_cv.value,
+            diameter_um=float(morph[0][0]), diameter_cv=float(morph[0][1]),
+            length_um=float(morph[1][0]), length_cv=float(morph[1][1]),
             persistence_um=persistence_um.value,
             crimp_amplitude_um=crimp_amplitude_um.value, crimp_period_um=crimp_period_um.value,
-            volume_fraction=volume_fraction.value if use_fraction.value else None,
+            volume_fraction=None if by_number else volume_fraction.value,
         )
         state.phantom = phantom
         state.voxel_size = phantom.meta.voxel_size_zyx
         state.bundle = None
-        _show_structure(state)
+        _show_structure(state, fibrils=show_fibrils.value, skeleton=show_skeleton.value,
+                        orientation=show_orientation.value)
         gt = phantom.ground_truth.global_
         msg = (f"{len(phantom.geometry)} fibrils | S={gt.S:.2f} biax={gt.biaxiality:.2f} "
                f"φ₀={np.rad2deg(gt.mean_phi):.0f}° φ_v={gt.volume_fraction:.2f}")
@@ -304,21 +347,38 @@ def _structure_tab(state: AppState):
 
     generate.changed.connect(_on_generate)
 
+    # Show all rows of both tables without an inner scrollbar.
+    _fit_table(volume, n_rows=3)
+    _fit_table(morphology, n_rows=2)
+
     return Container(
         widgets=[
-            Label(value="Block 1 — Imaged volume"), volume,
-            Label(value="Block 2 — Single fibril"),
-            n_fibrils, use_fraction, volume_fraction,
-            diameter_um, diameter_cv, length_um, length_cv,
-            persistence_um, crimp_amplitude_um, crimp_period_um,
-            Label(value="Block 3 — Network organization"),
+            Label(value="Imaged volume"), volume,
+            Label(value="Single fibril geometry"),
+            amount_mode, n_fibrils, volume_fraction,
+            morphology, persistence_um, crimp_row,
+            Label(value="Network organization"),
             architecture, mean_phi_deg, mean_theta_deg, phi_a_deg, phi_b_deg, mix,
             lamella_thickness_um, lamella_dphi_deg, theta_deep_deg, theta_surface_deg,
             helix_beta_deg, crossed, kappa_par, kappa_perp, xi_um, seed,
-            generate, status,
+            display_row, generate, status,
         ],
         labels=True, scrollable=True,
     )
+
+
+def _fit_table(table: Any, *, n_rows: int) -> None:
+    """Size a magicgui Table so all rows (plus header) are visible without scrolling."""
+    from qtpy.QtCore import Qt
+
+    native = table.native
+    native.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+    native.resizeRowsToContents()
+    header = native.horizontalHeader().height()
+    row_h = native.rowHeight(0) or 28
+    height = header + n_rows * row_h + 2 * native.frameWidth() + 4
+    native.setMinimumHeight(int(height))
+    native.setMaximumHeight(int(height) + 8)
 
 
 def _image_tab(state: AppState):
