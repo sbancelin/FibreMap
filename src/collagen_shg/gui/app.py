@@ -166,7 +166,7 @@ def main(argv: list[str] | None = None) -> int:
         elif args.path:
             launch(args.path)
         else:
-            from collagen_shg.gui.interactive import run_app
+            from collagen_shg.gui.tabs import run_app
 
             run_app()
     except ModuleNotFoundError as exc:
