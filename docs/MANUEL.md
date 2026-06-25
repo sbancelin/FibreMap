@@ -49,7 +49,7 @@ Optionnel : napari (`gui`), pytest/hypothesis/ruff (`dev`).
 ```powershell
 cd C:\LP2N\Software_FibreMap\FibreMap
 
-python -m pytest                       # toute la suite (~130 tests, ~30 s)
+python -m pytest                       # toute la suite (~164 tests, ~90 s)
 python -m pytest -q tests/test_metrics_structure_tensor.py   # un fichier
 python -m pytest -k closed_loop        # par mot-clé
 python -m ruff check src tests         # lint
@@ -117,29 +117,44 @@ Nécessite l'extra `gui` installé (`pip install -e ".[dev,gui]"`) et un afficha
 
 ### 4.1 Application interactive (le cas principal)
 
-Lancez **sans argument** → une appli à **3 onglets** s'ouvre dans napari (panneau de droite) :
+Lancez **sans argument** → l'appli s'ouvre dans napari avec un panneau à **onglets en haut**
+(`Structure` / `Image` / `Analysis`), textes en anglais :
 
 ```powershell
 collagen-shg-gui
 ```
 
-- **Onglet 1 · Structure** — réglez la ROI (`Z`, `Y`, `X` voxels ; `voxel_*_um`), le nombre de
-  fibrilles (`n_fibrils`), le `diameter_um` + `dispersion`, le crimp (`crimp_amplitude_um`,
-  `crimp_period_um`), l'organisation (`mean_phi_deg`, `kappa`, `xi_um`) et la `seed`.
-  Cliquez **« Générer la structure »** → s'affichent le volume de densité, l'orientation (RVB :
-  teinte = azimut) et le **squelette** des fibrilles ; la vérité-terrain (S2/S3/φ) est affichée
-  en notification.
-- **Onglet 2 · Imagerie** — réglez le microscope (`NA`, `wavelength_nm`, `detection`,
-  `attenuation_length_um`, `photons_peak`, `read_noise_e`, `seed`). Cliquez **« Générer
-  l'image »** → image SHG incohérente (modèle scalaire). La case **`realiste_tier2`** applique
-  une étape de raffinement *placeholder* (le vrai modèle, entraîné sur données réelles, viendra).
-- **Onglet 3 · Analyse** — **« Analyser l'image courante »** extrait l'organisation de l'image
-  générée (cartes orientation/cohérence + S2/S3/ξ/défauts en notification). **« Charger &
-  analyser »** ouvre un sélecteur de fichier pour une **image réelle** (OME-TIFF) ou un bundle, et
-  l'analyse de la même façon (les images 2D passent par les métriques 2D).
+**Onglet `Structure`** — organisé en 3 blocs :
 
-> Astuce : le volume est 3D — utilisez le **curseur en bas** pour parcourir les plans z, et l'œil
-> 👁 à gauche de chaque couche pour l'afficher/masquer.
+- **Block 1 — Imaged volume** : un tableau `Size (µm)` / `Voxel (µm)` × `X / Y / Z` ; la ligne
+  `# voxels` est **dérivée** (recalculée automatiquement, non éditable).
+- **Block 2 — Single fibril** : `Number of fibrils` (ou cochez *Use volume fraction* pour piloter
+  par `φ_v`), diamètre (`Diameter mean` + `CV`), longueur (`Length mean` + `CV`, 0 = traverse le
+  volume), ondulation (`Persistence Lp`, `Crimp amplitude`/`period`).
+- **Block 3 — Network organization** : menu **`Architecture`** (`uniaxial`, `biaxial`, `lamellar`,
+  `arcade`, `tubular`, `isotropic`) — les paramètres affichés changent selon le choix
+  (ex. `tubular` → angle d'hélice β + *Crossed ±β* ; `lamellar` → épaisseur + Δφ ; `arcade` →
+  θ profond/surface ; `biaxial` → axes A/B + mélange). Plus la **dispersion biaxiale** `κ∥`/`κ⊥`
+  et la **longueur de corrélation** `ξ`, et la `Seed`.
+
+→ **`Generate structure`** construit la **structure binaire** (1 = fibrille, 0 = vide) — de vrais
+tubes 3D — et l'affiche (`fibrils (binary)`, `skeleton`, `orientation (GT)`), avec un résumé de la
+vérité-terrain (`S`, biaxialité, φ₀, φ_v).
+
+Correspondance tissus → architecture : **tendon** = `uniaxial` (κ élevés) + crimp · **peau** =
+`biaxial` (axes Langer) ou `isotropic` (désordre) · **cornée** = `lamellar` (Δφ=90°) · **cartilage**
+= `arcade` · **paroi d'artère** = `tubular` (β, croisé).
+
+**Onglet `Image`** — microscope (`NA`, `Wavelength`, `Detection`, `Attenuation length`,
+`Peak photons`, `Read noise`) → **`Generate image`** (modèle scalaire incohérent). La case
+*Realistic (Tier 2)* applique un raffinement *placeholder* (modèle à entraîner sur données réelles).
+
+**Onglet `Analysis`** — **`Analyze current image`** extrait l'organisation de l'image générée
+(cartes orientation/cohérence + S2/S3/ξ/défauts). **`Load & analyze`** ouvre une **image réelle**
+(OME-TIFF) ou un bundle et l'analyse (images 2D → métriques 2D).
+
+> Astuce : volume 3D — **curseur en bas** pour parcourir z, œil 👁 à gauche d'une couche pour
+> l'afficher/masquer.
 
 ### 4.2 Modes rapides (optionnels)
 
