@@ -11,6 +11,8 @@ closed loop. Deterministic for a given ``{config, seed}``.
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
 import numpy as np
 
 from collagen_shg.config.models import StructureConfig
@@ -61,7 +63,13 @@ class ProceduralStructureGenerator:
         self.step_um = step_um or max(0.5, min(self.voxel_size_zyx))
 
     # ----------------------------------------------------------------- public API
-    def generate(self, config: StructureConfig, rng: np.random.Generator) -> Phantom:
+    def generate(
+        self,
+        config: StructureConfig,
+        rng: np.random.Generator,
+        *,
+        progress: Callable[[float], None] | None = None,
+    ) -> Phantom:
         z, y, x = self.shape_zyx
         dz, dy, dx = self.voxel_size_zyx
         extent = np.array([x * dx, y * dy, z * dz])  # physical (x, y, z) µm
@@ -84,7 +92,10 @@ class ProceduralStructureGenerator:
         fibrils: list[Fibril] = []
         sampled_dirs = np.zeros((n, 3))
 
+        report_every = max(1, n // 100)  # throttle progress callbacks to ~1% steps
         for i in range(n):
+            if progress is not None and i % report_every == 0:
+                progress(i / n)
             pop = populations[rng.choice(len(populations), p=weights)]
             seed = rng.uniform(0, 1, size=3) * extent
             mean0 = pop.field.at(seed[None])[0]
@@ -116,6 +127,9 @@ class ProceduralStructureGenerator:
             polarity=polarity_field,
         )
         ground_truth = _ground_truth(sampled_dirs, spec, float(occupancy.mean()))
+
+        if progress is not None:
+            progress(1.0)
 
         meta_seed = int(rng.integers(0, 2**31 - 1))
         meta_phantom = Phantom.empty(self.shape_zyx, self.voxel_size_zyx, seed=meta_seed,

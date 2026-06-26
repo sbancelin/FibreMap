@@ -27,7 +27,6 @@ from collagen_shg.gui.interactive import (
     image_phantom,
     microscope_config_from_params,
     refine_placeholder,
-    skeleton_paths,
 )
 from collagen_shg.gui.orientation import director_to_rgb
 
@@ -37,6 +36,7 @@ __all__ = [
     "arch_params_for",
     "build_structure_config",
     "generate_structure_phantom",
+    "skeleton_volume",
     "run_app",
 ]
 
@@ -127,34 +127,83 @@ def build_structure_config(
 
 
 def generate_structure_phantom(
-    size_xyz, voxel_xyz, architecture, arch_params, *, seed, n_fibrils=None, **fibril_org,
+    size_xyz, voxel_xyz, architecture, arch_params, *, seed, n_fibrils=None,
+    progress=None, **fibril_org,
 ):
-    """Build a binary-tube phantom from GUI parameters (deterministic for ``seed``)."""
+    """Build a binary-tube phantom from GUI parameters (deterministic for ``seed``).
+
+    ``progress`` is an optional ``callable(fraction)`` invoked during fibril growth (0..1).
+    """
     from collagen_shg.structure_generator.generator import ProceduralStructureGenerator
 
     shape_zyx, voxel_zyx = build_volume(size_xyz, voxel_xyz)
     config = build_structure_config(architecture, arch_params, **fibril_org)
     generator = ProceduralStructureGenerator(shape_zyx, voxel_zyx, n_fibrils=n_fibrils)
-    return generator.generate(config, np.random.default_rng(int(seed)))
+    return generator.generate(config, np.random.default_rng(int(seed)), progress=progress)
+
+
+def skeleton_volume(phantom: Any) -> np.ndarray:
+    """A thin binary volume marking the fibril centerlines (same coordinates as the tubes).
+
+    A 1-voxel-thick polyline along each fibril; co-centered with ``fibrils (binary)`` by
+    construction (identical ``round(point / voxel)`` indexing). Rendered as an image layer (not a
+    napari Shapes layer) so it stays aligned and avoids Shapes-related crashes.
+    """
+    z, y, x = phantom.meta.shape_zyx
+    dz, dy, dx = phantom.meta.voxel_size_zyx
+    vox = np.array([dx, dy, dz])
+    vol = np.zeros((z, y, x), dtype=np.float32)
+    for fib in phantom.geometry:
+        cl = np.asarray(fib.centerline, dtype=np.float64)
+        if cl.shape[0] < 2:
+            pts = cl
+        else:
+            seg = np.diff(cl, axis=0)
+            steps = np.maximum(2, (np.linalg.norm(seg / vox, axis=1) * 2).astype(int))
+            pts = np.concatenate(
+                [cl[k] + seg[k] * np.linspace(0, 1, steps[k])[:, None] for k in range(len(seg))]
+            )
+        idx = np.round(pts / vox).astype(int)
+        ix, iy, iz = idx[:, 0], idx[:, 1], idx[:, 2]
+        ok = (iz >= 0) & (iz < z) & (iy >= 0) & (iy < y) & (ix >= 0) & (ix < x)
+        vol[iz[ok], iy[ok], ix[ok]] = 1.0
+    return vol
 
 
 # --------------------------------------------------------------------------- display
+def _update_or_add_image(
+    viewer: Any, name: str, data: np.ndarray, *, scale: Any, visible: bool = True, **kw: Any
+) -> None:
+    """Add an image layer, or update an existing one **in place** (no delete+add churn).
+
+    Reusing the layer avoids the crashes/instability that delete+add of a selected layer can
+    cause; falls back to recreating the layer only if an in-place update fails.
+    """
+    data = np.asarray(data)
+    if name in viewer.layers:
+        try:
+            layer = viewer.layers[name]
+            layer.data = data
+            layer.scale = scale
+            layer.visible = visible
+            return
+        except Exception:
+            del viewer.layers[name]
+    viewer.add_image(data, name=name, scale=scale, visible=visible, **kw)
+
+
 def _show_structure(
     state: AppState, *, fibrils: bool = True, skeleton: bool = True, orientation: bool = False
 ) -> None:
     viewer, phantom = state.viewer, state.phantom
     scale = phantom.meta.voxel_size_zyx
-    _set_layer(viewer, "fibrils (binary)", np.asarray(phantom.fields.density), "image",
-               scale=scale, colormap="gray", blending="additive", visible=fibrils)
+    _update_or_add_image(viewer, "fibrils (binary)", phantom.fields.density,
+                         scale=scale, visible=fibrils, colormap="gray", blending="additive")
+    _update_or_add_image(viewer, "skeleton", skeleton_volume(phantom),
+                         scale=scale, visible=skeleton, colormap="green", blending="additive")
     rgb = director_to_rgb(np.asarray(phantom.fields.director), np.asarray(phantom.fields.order_S))
-    _set_layer(viewer, "orientation (GT)", rgb, "image", scale=scale, rgb=True, visible=orientation)
-    paths = skeleton_paths(phantom)
-    if "skeleton" in viewer.layers:
-        del viewer.layers["skeleton"]
-    if paths:
-        viewer.add_shapes(paths, shape_type="path", name="skeleton", scale=scale,
-                          edge_color="cyan", edge_width=0.3, blending="translucent",
-                          visible=skeleton)
+    _update_or_add_image(viewer, "orientation (GT)", rgb, scale=scale, visible=orientation,
+                         rgb=True)
 
 
 def _toggle_layer(viewer: Any, name: str, visible: bool) -> None:
@@ -163,23 +212,16 @@ def _toggle_layer(viewer: Any, name: str, visible: bool) -> None:
 
 
 def _show_image(state: AppState) -> None:
-    scale = state.bundle.metadata.voxel_size_zyx
-    _set_layer(state.viewer, "image", np.asarray(state.bundle.image), "image",
-               scale=scale, colormap="gray")
+    _update_or_add_image(state.viewer, "image", state.bundle.image,
+                         scale=state.bundle.metadata.voxel_size_zyx, colormap="gray")
 
 
 def _show_analysis(state: AppState, result: dict[str, Any]) -> None:
     scale = state.voxel_size
-    _set_layer(state.viewer, "orientation (measured)", np.asarray(result["orientation"]),
-               "image", scale=scale, colormap="hsv")
-    _set_layer(state.viewer, "coherence", np.asarray(result["coherence"]), "image",
-               scale=scale, colormap="inferno", visible=False)
-
-
-def _set_layer(viewer: Any, name: str, data: np.ndarray, kind: str, **kwargs: Any) -> None:
-    if name in viewer.layers:
-        del viewer.layers[name]
-    getattr(viewer, f"add_{kind}")(data, name=name, **kwargs)
+    _update_or_add_image(state.viewer, "orientation (measured)", result["orientation"],
+                         scale=scale, colormap="hsv")
+    _update_or_add_image(state.viewer, "coherence", result["coherence"],
+                         scale=scale, visible=False, colormap="inferno")
 
 
 # --------------------------------------------------------------------------- tab widgets
@@ -222,7 +264,7 @@ def _structure_tab(state: AppState):
     # --- Block 2: single fibril geometry ---
     amount_mode = ComboBox(choices=["Number of fibrils", "Volume fraction"],
                            value="Number of fibrils", label="Amount by")
-    n_fibrils = SpinBox(value=150, min=1, max=20000, label="Number of fibrils")
+    n_fibrils = SpinBox(value=40, min=1, max=20000, label="Number of fibrils")
     volume_fraction = FloatSpinBox(value=0.1, min=0.0, max=1.0, step=0.01,
                                    label="Volume fraction φ_v")
 
@@ -308,7 +350,8 @@ def _structure_tab(state: AppState):
     generate = PushButton(text="Generate structure")
     status = Label(value="")
 
-    def _on_generate(*_: Any) -> None:
+    def _collect_params() -> dict[str, Any]:
+        """Read every widget on the GUI thread into a plain kwargs dict for the worker."""
         _refresh_counts()
         data = [list(row) for row in volume.data]
         size = tuple(float(v) for v in data[0])
@@ -324,8 +367,9 @@ def _structure_tab(state: AppState):
         }
         params = arch_params_for(str(architecture.value), flat)
         by_number = amount_mode.value == "Number of fibrils"
-        phantom = generate_structure_phantom(
-            size, vox, str(architecture.value), params, seed=seed.value,
+        return dict(
+            size_xyz=size, voxel_xyz=vox, architecture=str(architecture.value),
+            arch_params=params, seed=seed.value,
             n_fibrils=int(n_fibrils.value) if by_number else None,
             kappa_par=kappa_par.value, kappa_perp=kappa_perp.value, xi_um=xi_um.value,
             diameter_um=float(morph[0][0]), diameter_cv=float(morph[0][1]),
@@ -334,16 +378,59 @@ def _structure_tab(state: AppState):
             crimp_amplitude_um=crimp_amplitude_um.value, crimp_period_um=crimp_period_um.value,
             volume_fraction=None if by_number else volume_fraction.value,
         )
-        state.phantom = phantom
-        state.voxel_size = phantom.meta.voxel_size_zyx
-        state.bundle = None
-        _show_structure(state, fibrils=show_fibrils.value, skeleton=show_skeleton.value,
-                        orientation=show_orientation.value)
-        gt = phantom.ground_truth.global_
-        msg = (f"{len(phantom.geometry)} fibrils | S={gt.S:.2f} biax={gt.biaxiality:.2f} "
-               f"φ₀={np.rad2deg(gt.mean_phi):.0f}° φ_v={gt.volume_fraction:.2f}")
-        status.value = msg
-        show_info("Structure: " + msg)
+
+    def _on_generate(*_: Any) -> None:
+        # Run the (slow) generation off the Qt thread so the GUI stays responsive; the worker's
+        # ``returned`` signal fires back on the main thread, where touching napari layers is safe.
+        from napari.qt.threading import thread_worker
+
+        kwargs = _collect_params()
+        report = state.extra.get("report_progress")  # thread-safe Qt-signal emit (or None)
+        bar = state.extra.get("progress")
+        generate.enabled = False  # block re-entrant generation (the relaunch crash)
+        if bar is not None:
+            bar.setRange(0, 100)
+            bar.setValue(0)
+            bar.setFormat("Generating… %p%")
+        status.value = "Generating…"
+
+        @thread_worker
+        def _work() -> Any:
+            return generate_structure_phantom(progress=report, **kwargs)
+
+        def _on_done(phantom: Any) -> None:
+            state.phantom = phantom
+            state.voxel_size = phantom.meta.voxel_size_zyx
+            state.bundle = None
+            _show_structure(state, fibrils=show_fibrils.value, skeleton=show_skeleton.value,
+                            orientation=show_orientation.value)
+            gt = phantom.ground_truth.global_
+            msg = (f"{len(phantom.geometry)} fibrils | S={gt.S:.2f} biax={gt.biaxiality:.2f} "
+                   f"φ₀={np.rad2deg(gt.mean_phi):.0f}° φ_v={gt.volume_fraction:.2f}")
+            status.value = msg
+            show_info("Structure: " + msg)
+            if bar is not None:
+                bar.setValue(100)
+                bar.setFormat("Done")
+
+        def _on_error(exc: BaseException) -> None:
+            import logging
+
+            logging.getLogger("collagen_shg").error(
+                "Structure generation failed", exc_info=exc)
+            status.value = f"Generation failed: {exc}"
+            show_info(f"Generation failed: {exc}")
+            if bar is not None:
+                bar.setFormat("Error")
+
+        def _on_finish() -> None:
+            generate.enabled = True  # re-arm even if generation failed
+
+        worker = _work()
+        worker.returned.connect(_on_done)
+        worker.errored.connect(_on_error)
+        worker.finished.connect(_on_finish)
+        worker.start()
 
     generate.changed.connect(_on_generate)
 
@@ -469,15 +556,42 @@ def _analysis_tab(state: AppState):
 
 # --------------------------------------------------------------------------- assembly / launch
 def build_tabbed_app(viewer: Any) -> AppState:
-    """Attach a single tabbed dock (tabs at the top): Structure / Image / Analysis."""
-    from qtpy.QtWidgets import QTabWidget
+    """Attach a single tabbed dock (tabs at the top): Structure / Image / Analysis.
+
+    A shared progress bar sits at the bottom of the dock; long jobs report into it through a
+    thread-safe progress bridge stored on ``state.extra`` so the worker never touches Qt widgets
+    directly (cross-thread ``Signal`` delivery is queued onto the GUI thread).
+    """
+    from qtpy.QtCore import QObject, Signal
+    from qtpy.QtWidgets import QProgressBar, QTabWidget, QVBoxLayout, QWidget
+
+    class _ProgressBridge(QObject):
+        tick = Signal(float)
 
     state = AppState(viewer=viewer)
+
+    progress = QProgressBar()
+    progress.setRange(0, 100)
+    progress.setValue(0)
+    progress.setTextVisible(True)
+    progress.setFormat("Ready")
+    bridge = _ProgressBridge()
+    bridge.tick.connect(lambda f: progress.setValue(int(f * 100)))
+    state.extra["progress"] = progress
+    state.extra["progress_bridge"] = bridge  # keep the QObject alive
+    state.extra["report_progress"] = bridge.tick.emit  # call from any thread
+
     tabs = QTabWidget()
     tabs.addTab(_structure_tab(state).native, "Structure")
     tabs.addTab(_image_tab(state).native, "Image")
     tabs.addTab(_analysis_tab(state).native, "Analysis")
-    viewer.window.add_dock_widget(tabs, name="collagen-shg", area="right")
+
+    container = QWidget()
+    layout = QVBoxLayout(container)
+    layout.setContentsMargins(0, 0, 0, 0)
+    layout.addWidget(tabs)
+    layout.addWidget(progress)
+    viewer.window.add_dock_widget(container, name="collagen-shg", area="right")
     return state
 
 

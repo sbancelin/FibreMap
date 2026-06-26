@@ -9,6 +9,7 @@ from collagen_shg.gui.tabs import (
     build_structure_config,
     build_volume,
     generate_structure_phantom,
+    skeleton_volume,
     voxel_counts,
 )
 
@@ -70,6 +71,24 @@ def test_generate_with_volume_fraction():
     assert len(phantom.geometry) > 0
     dens = np.asarray(phantom.fields.density)
     assert set(np.round(np.unique(dens), 6)).issubset({0.0, 1.0})
+
+
+def test_skeleton_is_binary_and_inside_the_tubes():
+    phantom = generate_structure_phantom(
+        (12.0, 12.0, 4.0), (0.25, 0.25, 0.5), "uniaxial",
+        {"mean_phi_deg": 90.0, "mean_theta_deg": 0.0}, seed=0, n_fibrils=30,
+        kappa_par=30, kappa_perp=30, xi_um=40, diameter_um=1.5, diameter_cv=0.2,
+        length_um=0.0, length_cv=0.0, persistence_um=1e6,
+        crimp_amplitude_um=0.0, crimp_period_um=0.0,
+    )
+    skel = skeleton_volume(phantom)
+    dens = np.asarray(phantom.fields.density)
+    assert skel.shape == dens.shape
+    assert set(np.round(np.unique(skel), 6)).issubset({0.0, 1.0})  # binary
+    assert skel.sum() > 0
+    # the centerline (skeleton) lies inside the fibril tubes: most skeleton voxels are occupied
+    inside = float((dens[skel > 0] > 0).mean())
+    assert inside > 0.9
 
 
 def test_isotropic_many_fibrils_low_order():
