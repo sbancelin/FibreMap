@@ -192,23 +192,42 @@ def _update_or_add_image(
     viewer.add_image(data, name=name, scale=scale, visible=visible, **kw)
 
 
+def _structure_layer_specs(phantom: Any) -> dict[str, tuple[Any, dict[str, Any]]]:
+    return {
+        "fibrils (binary)": (lambda: np.asarray(phantom.fields.density),
+                             {"colormap": "gray", "blending": "additive"}),
+        "skeleton": (lambda: skeleton_volume(phantom),
+                     {"colormap": "green", "blending": "additive"}),
+        "orientation (GT)": (
+            lambda: director_to_rgb(np.asarray(phantom.fields.director),
+                                    np.asarray(phantom.fields.order_S)),
+            {"rgb": True},
+        ),
+    }
+
+
+def _apply_structure_layer(state: AppState, name: str, show: bool) -> None:
+    """Add the layer (built from the current phantom) when ``show``, else remove it entirely.
+
+    The Display checkboxes therefore decide which images are *produced* — an unchecked box means
+    that image is not generated/shown at all (not merely hidden).
+    """
+    viewer = state.viewer
+    if not show or state.phantom is None:
+        if name in viewer.layers:
+            del viewer.layers[name]
+        return
+    data_fn, kw = _structure_layer_specs(state.phantom)[name]
+    _update_or_add_image(viewer, name, data_fn(),
+                         scale=state.phantom.meta.voxel_size_zyx, visible=True, **kw)
+
+
 def _show_structure(
     state: AppState, *, fibrils: bool = True, skeleton: bool = True, orientation: bool = False
 ) -> None:
-    viewer, phantom = state.viewer, state.phantom
-    scale = phantom.meta.voxel_size_zyx
-    _update_or_add_image(viewer, "fibrils (binary)", phantom.fields.density,
-                         scale=scale, visible=fibrils, colormap="gray", blending="additive")
-    _update_or_add_image(viewer, "skeleton", skeleton_volume(phantom),
-                         scale=scale, visible=skeleton, colormap="green", blending="additive")
-    rgb = director_to_rgb(np.asarray(phantom.fields.director), np.asarray(phantom.fields.order_S))
-    _update_or_add_image(viewer, "orientation (GT)", rgb, scale=scale, visible=orientation,
-                         rgb=True)
-
-
-def _toggle_layer(viewer: Any, name: str, visible: bool) -> None:
-    if name in viewer.layers:
-        viewer.layers[name].visible = visible
+    _apply_structure_layer(state, "fibrils (binary)", fibrils)
+    _apply_structure_layer(state, "skeleton", skeleton)
+    _apply_structure_layer(state, "orientation (GT)", orientation)
 
 
 def _show_image(state: AppState) -> None:
@@ -277,9 +296,10 @@ def _structure_tab(state: AppState):
     _amount_visibility()
 
     # Diameter / length distribution table (CV = coefficient of variation = std / mean).
+    # Defaults: thin fibrils ~300 nm, length ~10 µm (collagen fibrils span ~10 nm to 1 µm).
     morphology = Table(
         value={
-            "data": [[1.0, 0.3], [0.0, 0.0]],
+            "data": [[0.3, 0.3], [10.0, 0.3]],
             "index": ["Diameter (µm)", "Length (µm)"],
             "columns": ["Mean", "CV"],
         }
@@ -339,11 +359,11 @@ def _structure_tab(state: AppState):
     show_skeleton = CheckBox(value=True, label="Skeleton")
     show_orientation = CheckBox(value=False, label="Orientation (GT)")
     show_fibrils.changed.connect(
-        lambda *_: _toggle_layer(state.viewer, "fibrils (binary)", show_fibrils.value))
+        lambda *_: _apply_structure_layer(state, "fibrils (binary)", show_fibrils.value))
     show_skeleton.changed.connect(
-        lambda *_: _toggle_layer(state.viewer, "skeleton", show_skeleton.value))
+        lambda *_: _apply_structure_layer(state, "skeleton", show_skeleton.value))
     show_orientation.changed.connect(
-        lambda *_: _toggle_layer(state.viewer, "orientation (GT)", show_orientation.value))
+        lambda *_: _apply_structure_layer(state, "orientation (GT)", show_orientation.value))
     display_row = Container(widgets=[show_fibrils, show_skeleton, show_orientation],
                             layout="horizontal", label="Display", labels=False)
 

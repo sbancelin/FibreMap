@@ -157,13 +157,13 @@ def _grow_fibril(field, seed, base_dir, mean0, length, ds, persistence_um,
     def walk(sign: int):
         pts = []
         p = seed.copy()
-        d = base_dir * sign
         for _ in range(n_half):
             local = field.at(p[None])[0]
-            d = local * sign + offset
+            # (local + offset) tilts the local field by the per-fibril offset; *sign grows the
+            # two halves symmetrically (forward ~ +base_dir, backward ~ -base_dir).
+            d = (local + offset) * sign
             if np.isfinite(persistence_um) and persistence_um > 0:
-                wobble = rng.normal(0, np.sqrt(2 * ds / persistence_um), 3)
-                d = d + wobble
+                d = d + rng.normal(0, np.sqrt(2 * ds / persistence_um), 3)
             nd = np.linalg.norm(d)
             d = d / nd if nd > 0 else base_dir * sign
             p = p + d * ds
@@ -286,13 +286,17 @@ def _read_spec(config: StructureConfig) -> dict:
     params.setdefault("mean_phi_deg", _get(orient, "mean_phi_deg", 0.0))
 
     kappa = float(_get(orient, "kappa", 4.0))
+    kappa_par = float(_get(orient, "kappa_par", kappa))
+    kappa_perp = float(_get(orient, "kappa_perp", kappa))
     if arch_name == "isotropic":
-        kappa = 0.0
+        # isotropic = no preferred direction: force zero concentration regardless of the GUI
+        # kappa fields (which otherwise override the fallback and make it look unidirectional).
+        kappa_par = kappa_perp = 0.0
     return {
         "architecture": arch_name,
         "params": params,
-        "kappa_par": float(_get(orient, "kappa_par", kappa)),
-        "kappa_perp": float(_get(orient, "kappa_perp", kappa)),
+        "kappa_par": kappa_par,
+        "kappa_perp": kappa_perp,
         "xi_um": _get(orient, "xi_um", None),
         "diameter_um": float(_get(fibril.diameter_um, "mean", 1.0)),
         "diameter_cv": float(_get(fibril.diameter_um, "dispersion", 0.0)),
