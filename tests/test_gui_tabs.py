@@ -73,6 +73,34 @@ def test_generate_with_volume_fraction():
     assert set(np.round(np.unique(dens), 6)).issubset({0.0, 1.0})
 
 
+def test_network_features_through_gui_path():
+    # exclusion + branching + hierarchy all wired from the GUI helper into the generator
+    phantom = generate_structure_phantom(
+        (12.0, 12.0, 4.0), (0.25, 0.25, 0.5), "uniaxial",
+        {"mean_phi_deg": 0.0, "mean_theta_deg": 0.0}, seed=0, n_fibrils=30,
+        kappa_par=20, kappa_perp=20, xi_um=40, diameter_um=0.4, diameter_cv=0.2,
+        length_um=8.0, length_cv=0.3, persistence_um=1e6,
+        crimp_amplitude_um=0.0, crimp_period_um=0.0,
+        exclusion=True,
+        branching={"density_per_um": 0.2, "angle_deg": 40},
+    )
+    assert np.asarray(phantom.fields.density).max() == 1.0
+    assert any(f.type == "branch" for f in phantom.geometry)
+
+
+def test_hierarchy_through_gui_path():
+    phantom = generate_structure_phantom(
+        (12.0, 12.0, 4.0), (0.25, 0.25, 0.5), "uniaxial", {"mean_phi_deg": 0.0},
+        seed=1, n_fibrils=None,
+        kappa_par=20, kappa_perp=20, xi_um=40, diameter_um=0.4, diameter_cv=0.2,
+        length_um=8.0, length_cv=0.3, persistence_um=1e6,
+        crimp_amplitude_um=0.0, crimp_period_um=0.0,
+        hierarchy={"enabled": True, "n_fascicles": 2, "fibers_per_fascicle": 2,
+                   "fibrils_per_fiber": 4},
+    )
+    assert {f.fascicle_id for f in phantom.geometry} == {0, 1}
+
+
 def test_skeleton_is_binary_and_inside_the_tubes():
     phantom = generate_structure_phantom(
         (12.0, 12.0, 4.0), (0.25, 0.25, 0.5), "uniaxial",

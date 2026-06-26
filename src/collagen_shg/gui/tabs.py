@@ -101,6 +101,10 @@ def build_structure_config(
     crimp_amplitude_um: float,
     crimp_period_um: float,
     volume_fraction: float | None = None,
+    exclusion: bool = False,
+    branching: dict[str, Any] | None = None,
+    crosslinks: dict[str, Any] | None = None,
+    hierarchy: dict[str, Any] | None = None,
 ):
     """Assemble a :class:`StructureConfig` from the GUI blocks (architecture-aware)."""
     from collagen_shg.config.models import StructureConfig
@@ -123,6 +127,14 @@ def build_structure_config(
     }
     if volume_fraction is not None:
         data["volume_fraction"] = volume_fraction
+    if exclusion:
+        data["exclusion"] = True
+    if branching:
+        data["branching"] = branching
+    if crosslinks:
+        data["crosslinks"] = crosslinks
+    if hierarchy:
+        data["hierarchy"] = hierarchy
     return StructureConfig.model_validate(data)
 
 
@@ -334,6 +346,27 @@ def _structure_tab(state: AppState):
     xi_um = FloatSpinBox(value=40.0, min=0.1, max=1000.0, label="Correlation length ξ (µm)")
     seed = SpinBox(value=0, min=0, max=2**31 - 1, label="Seed")
 
+    # --- Network features (volume exclusion, branching/crosslinks, hierarchy) ---
+    exclusion = CheckBox(value=False, label="Volume exclusion (no overlap)")
+    branch_density = FloatSpinBox(value=0.0, min=0.0, max=2.0, step=0.02,
+                                  label="Branch density (/µm)")
+    branch_angle = FloatSpinBox(value=30.0, min=0.0, max=90.0, label="Branch angle (°)")
+    crosslink_density = FloatSpinBox(value=0.0, min=0.0, max=2.0, step=0.01,
+                                     label="Crosslink density (/µm³)")
+    crosslink_max = FloatSpinBox(value=2.0, min=0.1, max=20.0, label="Crosslink max dist (µm)")
+    hierarchy_on = CheckBox(value=False, label="Hierarchy (fascicles/fibers)")
+    n_fascicles = SpinBox(value=3, min=1, max=100, label="Fascicles")
+    fibers_per_fascicle = SpinBox(value=4, min=1, max=100, label="Fibers / fascicle")
+    fibrils_per_fiber = SpinBox(value=8, min=1, max=500, label="Fibrils / fiber")
+    _hierarchy_fields = [n_fascicles, fibers_per_fascicle, fibrils_per_fiber]
+
+    def _hierarchy_visibility(*_: Any) -> None:
+        for w in _hierarchy_fields:
+            w.visible = bool(hierarchy_on.value)
+
+    hierarchy_on.changed.connect(_hierarchy_visibility)
+    _hierarchy_visibility()
+
     arch_specific = {
         "uniaxial": [mean_phi_deg, mean_theta_deg],
         "isotropic": [],
@@ -387,6 +420,14 @@ def _structure_tab(state: AppState):
         }
         params = arch_params_for(str(architecture.value), flat)
         by_number = amount_mode.value == "Number of fibrils"
+        branching = ({"density_per_um": branch_density.value, "angle_deg": branch_angle.value}
+                     if branch_density.value > 0 else None)
+        crosslinks = ({"density_per_um3": crosslink_density.value, "max_um": crosslink_max.value}
+                      if crosslink_density.value > 0 else None)
+        hierarchy = ({"enabled": True, "n_fascicles": int(n_fascicles.value),
+                      "fibers_per_fascicle": int(fibers_per_fascicle.value),
+                      "fibrils_per_fiber": int(fibrils_per_fiber.value)}
+                     if hierarchy_on.value else None)
         return dict(
             size_xyz=size, voxel_xyz=vox, architecture=str(architecture.value),
             arch_params=params, seed=seed.value,
@@ -397,6 +438,8 @@ def _structure_tab(state: AppState):
             persistence_um=persistence_um.value,
             crimp_amplitude_um=crimp_amplitude_um.value, crimp_period_um=crimp_period_um.value,
             volume_fraction=None if by_number else volume_fraction.value,
+            exclusion=bool(exclusion.value), branching=branching,
+            crosslinks=crosslinks, hierarchy=hierarchy,
         )
 
     def _on_generate(*_: Any) -> None:
@@ -468,6 +511,9 @@ def _structure_tab(state: AppState):
             architecture, mean_phi_deg, mean_theta_deg, phi_a_deg, phi_b_deg, mix,
             lamella_thickness_um, lamella_dphi_deg, theta_deep_deg, theta_surface_deg,
             helix_beta_deg, crossed, kappa_par, kappa_perp, xi_um, seed,
+            Label(value="Network features"),
+            exclusion, branch_density, branch_angle, crosslink_density, crosslink_max,
+            hierarchy_on, n_fascicles, fibers_per_fascicle, fibrils_per_fiber,
             display_row, generate, status,
         ],
         labels=True, scrollable=True,
