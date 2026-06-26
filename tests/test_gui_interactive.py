@@ -41,7 +41,9 @@ def test_generate_structure_is_deterministic():
     b = generate_structure(SHAPE, VOXEL, n_fibrils=40, seed=1, **_STRUCT)
     assert np.array_equal(a.fields.director, b.fields.director)
     assert a.ground_truth.global_.S2 > 0.7  # high kappa -> aligned
-    assert len(a.geometry) == 40
+    # most fibrils placed (a few may fall entirely outside a small volume and are dropped)
+    assert 36 <= len(a.geometry) <= 40
+    assert len(a.geometry) == len(b.geometry)  # deterministic count
 
 
 def test_image_phantom_and_skeleton():

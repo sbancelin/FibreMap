@@ -145,6 +145,15 @@ Correspondance tissus → architecture : **tendon** = `uniaxial` (κ élevés) +
 `biaxial` (axes Langer) ou `isotropic` (désordre) · **cornée** = `lamellar` (Δφ=90°) · **cartilage**
 = `arcade` · **paroi d'artère** = `tubular` (β, croisé).
 
+Sous-bloc **Network features** (pour des réseaux plus réalistes) :
+- **Volume exclusion** : les fibrilles ne se chevauchent pas (un voxel = une fibrille) ; le
+  packing plafonne alors la fraction volumique (cornée, tendon).
+- **Branch density / angle** : les fibrilles se ramifient (points de branchement) — peau, gels.
+- **Crosslink density / max dist** : des connecteurs courts relient les fibrilles proches
+  (connectivité de réseau).
+- **Hierarchy** : regroupe les fibrilles en fibres, et les fibres en fascicules (tendon) ; définit
+  `Fascicles`, `Fibers / fascicle`, `Fibrils / fiber` (ces 3 champs apparaissent quand coché).
+
 **Onglet `Image`** — microscope (`NA`, `Wavelength`, `Detection`, `Attenuation length`,
 `Peak photons`, `Read noise`) → **`Generate image`** (modèle scalaire incohérent). La case
 *Realistic (Tier 2)* applique un raffinement *placeholder* (modèle à entraîner sur données réelles).
